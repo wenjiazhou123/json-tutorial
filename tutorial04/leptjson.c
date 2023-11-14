@@ -95,43 +95,71 @@ static int lept_parse_number(lept_context *c, lept_value *v) {
 
 static const char *lept_parse_hex4(const char *p, unsigned *u) {
     /* \TODO */
-    assert(u != NULL);
+    /* assert(u != NULL);
+     *u = 0;
+     size_t i;
+     for (i = 0; i < 4; ++i) {
+         if (ISDIGIT(p[i])) {
+             *u |= (unsigned) ((p[i] - '0') << ((3 - i) * 4));
+         } else if (ISLOWLETTERATOF(p[i])) {
+             *u = *u | (unsigned) ((p[i] - 'a' + 10) << ((3 - i) * 4));
+         } else if (ISHIGHLETTERATOF(p[i])) {
+             *u = *u | (unsigned) ((p[i] - 'A' + 10) << ((3 - i) * 4));
+         } else {
+             return p;
+         }
+     }
+     p += 4;
+     return p;*/
+    int i;
     *u = 0;
-    size_t i;
-    for (i = 0; i < 4; ++i) {
-        if (ISDIGIT(p[i])) {
-            *u |= (unsigned) ((p[i] - '0') << ((3 - i) * 4));
-        } else if (ISLOWLETTERATOF(p[i])) {
-            *u = *u | (unsigned) ((p[i] - 'a' + 10) << ((3 - i) * 4));
-        } else if (ISHIGHLETTERATOF(p[i])) {
-            *u = *u | (unsigned) ((p[i] - 'A' + 10) << ((3 - i) * 4));
-        } else {
-            return p;
-        }
+    for (i = 0; i < 4; i++) {
+        char ch = *p++;
+        *u <<= 4;
+        if (ISDIGIT(ch)) *u |= ch - '0';
+        else if (ISHIGHLETTERATOF(ch)) *u |= ch - ('A' - 10);
+        else if (ISLOWLETTERATOF(ch)) *u |= ch - ('a' - 10);
+        else { return NULL; }
     }
-    p += 4;
     return p;
 }
 
-static void lept_encode_utf8(lept_context *c, unsigned u) {
-    /* \TODO */
+/*static void lept_encode_utf8(lept_context *c, unsigned u) {
     if (u <= 0x007F) {
         PUTC(c, u);
     } else if (u <= 0x07FF) {
-        /*U+0080 ~ U+07FF	11	110xxxxx	10xxxxxx*/
+        *//*U+0080 ~ U+07FF	11	110xxxxx	10xxxxxx*//*
         PUTC(c, 0xC0 | ((u >> 6) & 0x1F));
         PUTC(c, 0x80 | (u & 0x3F));
     } else if (u <= 0xFFFF) {
-        /*U+0800 ~ U+FFFF	16	1110xxxx	10xxxxxx	10xxxxxx	*/
+        *//*U+0800 ~ U+FFFF	16	1110xxxx	10xxxxxx	10xxxxxx	*//*
         PUTC(c, 0xE0 | ((u >> 12)) & 0xf);
         PUTC(c, 0x80 | ((u >> 6)) & 0x3f);
         PUTC(c, 0x80 | u & 0x3f);
     } else if (u <= 0x10FFFF) {
-        /*21	11110xxx	10xxxxxx	10xxxxxx	10xxxxxx*/
+        *//*21	11110xxx	10xxxxxx	10xxxxxx	10xxxxxx*//*
         PUTC(c, 0xF0 | ((u >> 18) & 0x7));
         PUTC(c, 0x80 | ((u >> 12) & 0x3f));
         PUTC(c, 0x80 | ((u >> 6) & 0x3f));
         PUTC(c, 0x80 | (u & 0x3f));
+    }
+}*/
+static void lept_encode_utf8(lept_context *c, unsigned u) {
+    if (u <= 0x7F)
+        PUTC(c, u & 0xFF);
+    else if (u <= 0x7FF) {
+        PUTC(c, 0xC0 | ((u >> 6) & 0xFF));
+        PUTC(c, 0x80 | (u & 0x3F));
+    } else if (u <= 0xFFFF) {
+        PUTC(c, 0xE0 | ((u >> 12) & 0xFF));
+        PUTC(c, 0x80 | ((u >> 6) & 0x3F));
+        PUTC(c, 0x80 | (u & 0x3F));
+    } else {
+        assert(u <= 0x10FFFF);
+        PUTC(c, 0xF0 | ((u >> 18) & 0xFF));
+        PUTC(c, 0x80 | ((u >> 12) & 0x3F));
+        PUTC(c, 0x80 | ((u >> 6) & 0x3F));
+        PUTC(c, 0x80 | (u & 0x3F));
     }
 }
 
@@ -139,7 +167,7 @@ static void lept_encode_utf8(lept_context *c, unsigned u) {
 
 static int lept_parse_string(lept_context *c, lept_value *v) {
     size_t head = c->top, len;
-    unsigned u;
+    unsigned u,u2;
     const char *p;
     EXPECT(c, '\"');
     p = c->json;
@@ -177,29 +205,28 @@ static int lept_parse_string(lept_context *c, lept_value *v) {
                     case 't':
                         PUTC(c, '\t');
                         break;
-                    case 'u':
-                        if (!(ISDIGIT(p[0]) || ISLOWLETTERATOF(p[0]) || ISHIGHLETTERATOF(p[0]))) {
-                            return LEPT_PARSE_INVALID_UNICODE_HEX;
-                        } else if (!(ISDIGIT(p[1]) || ISLOWLETTERATOF(p[1]) || ISHIGHLETTERATOF(p[1]))) {
-                            return LEPT_PARSE_INVALID_UNICODE_HEX;
-                        } else if (!(ISDIGIT(p[2]) || ISLOWLETTERATOF(p[2]) || ISHIGHLETTERATOF(p[2]))) {
-                            return LEPT_PARSE_INVALID_UNICODE_HEX;
-                        } else if (!(ISDIGIT(p[3]) || ISLOWLETTERATOF(p[3]) || ISHIGHLETTERATOF(p[3]))) {
-                            return LEPT_PARSE_INVALID_UNICODE_HEX;
-                        }
+                        /*case 'u':
+                            if (!(ISDIGIT(p[0]) || ISLOWLETTERATOF(p[0]) || ISHIGHLETTERATOF(p[0]))) {
+                                return LEPT_PARSE_INVALID_UNICODE_HEX;
+                            } else if (!(ISDIGIT(p[1]) || ISLOWLETTERATOF(p[1]) || ISHIGHLETTERATOF(p[1]))) {
+                                return LEPT_PARSE_INVALID_UNICODE_HEX;
+                            } else if (!(ISDIGIT(p[2]) || ISLOWLETTERATOF(p[2]) || ISHIGHLETTERATOF(p[2]))) {
+                                return LEPT_PARSE_INVALID_UNICODE_HEX;
+                            } else if (!(ISDIGIT(p[3]) || ISLOWLETTERATOF(p[3]) || ISHIGHLETTERATOF(p[3]))) {
+                                return LEPT_PARSE_INVALID_UNICODE_HEX;
+                            }
 
-                        if (!(p = lept_parse_hex4(p, &u))) {
-                            STRING_ERROR(LEPT_PARSE_INVALID_UNICODE_HEX);
-                        }
-                        /* \TODO surrogate handling */
-                        /* U+D800 至 U+DBFF*/
+                            if (!(p = lept_parse_hex4(p, &u))) {
+                                STRING_ERROR(LEPT_PARSE_INVALID_UNICODE_HEX);
+                            }
+                        *//* U+D800 至 U+DBFF*//*
                         if (u >= 0xD800 && u <= 0xDBFF) {
                             unsigned low;
                             if (*p == '\\' && *(++p) == 'u') {
                                 p++;
                                 if (!(p = lept_parse_hex4(p, &low)))
                                     STRING_ERROR(LEPT_PARSE_INVALID_UNICODE_HEX);
-                                else if (low >= 0xDC00 && low <= 0xDFFF) { /* U+D800 至 U+DBFF*/
+                                else if (low >= 0xDC00 && low <= 0xDFFF) { *//* U+D800 至 U+DBFF*//*
                                     u = 0x10000 + (u - 0xD800) * 0x400 + (low - 0xDC00);
                                 } else {
                                     return LEPT_PARSE_INVALID_UNICODE_SURROGATE;
@@ -207,6 +234,22 @@ static int lept_parse_string(lept_context *c, lept_value *v) {
                             } else {
                                 return LEPT_PARSE_INVALID_UNICODE_SURROGATE;
                             }
+                        }
+                        lept_encode_utf8(c, u);
+                        break;*/
+                    case 'u':
+                        if (!(p = lept_parse_hex4(p, &u)))
+                            STRING_ERROR(LEPT_PARSE_INVALID_UNICODE_HEX);
+                        if (u >= 0xD800 && u <= 0xDBFF) { /* surrogate pair */
+                            if (*p++ != '\\')
+                                STRING_ERROR(LEPT_PARSE_INVALID_UNICODE_SURROGATE);
+                            if (*p++ != 'u')
+                                STRING_ERROR(LEPT_PARSE_INVALID_UNICODE_SURROGATE);
+                            if (!(p = lept_parse_hex4(p, &u2)))
+                                STRING_ERROR(LEPT_PARSE_INVALID_UNICODE_HEX);
+                            if (u2 < 0xDC00 || u2 > 0xDFFF)
+                                STRING_ERROR(LEPT_PARSE_INVALID_UNICODE_SURROGATE);
+                            u = (((u - 0xD800) << 10) | (u2 - 0xDC00)) + 0x10000;
                         }
                         lept_encode_utf8(c, u);
                         break;
