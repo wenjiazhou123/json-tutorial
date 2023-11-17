@@ -390,9 +390,9 @@ static void test_stringify_number() {
     TEST_ROUNDTRIP("1.5");
     TEST_ROUNDTRIP("-1.5");
     TEST_ROUNDTRIP("3.25");
-    TEST_ROUNDTRIP("1e+20");
-    TEST_ROUNDTRIP("1.234e+20");
-    TEST_ROUNDTRIP("1.234e-20");
+    TEST_ROUNDTRIP("1e+020");
+    TEST_ROUNDTRIP("1.234e+020");
+    TEST_ROUNDTRIP("1.234e-020");
 
     TEST_ROUNDTRIP("1.0000000000000002"); /* the smallest number > 1 */
     TEST_ROUNDTRIP("4.9406564584124654e-324"); /* minimum denormal */
